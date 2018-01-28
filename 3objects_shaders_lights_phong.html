@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>demo - Phong shader</title>
+		<meta charset="utf-8">
+		<style>
+			body {
+			  	margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+<body>
+
+<div id="container"></div>
+
+
+<script src="js/three.js"></script>
+
+<script id="vertexPhong" type="x-shader/x-vertex">
+
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+
+attribute vec3 position;
+attribute vec3 normal;
+
+uniform vec3 light1_pos;
+uniform vec3 light2_pos;
+
+varying vec3 N, L1, L2, V;
+
+void main()
+{
+
+	vec4 position = viewMatrix * modelMatrix * vec4(position, 1.0);
+
+	vec3 P = position.xyz;
+
+	N = vec3(normalize(viewMatrix * modelMatrix * vec4(normal.xyz, 0.0)).xyz);
+
+	vec4 L1_cam = viewMatrix * vec4(light1_pos,1.0);
+	vec4 L2_cam = viewMatrix * vec4(light2_pos,1.0);
+
+	L1 = vec3(normalize(L1_cam - position).xyz);
+	L2 = vec3(normalize(L2_cam - position).xyz);
+
+	V = normalize(-P);
+
+	gl_Position = projectionMatrix * position;
+
+}
+
+
+</script>
+
+
+<script id="fragmentPhong" type="x-shader/x-fragment">
+
+precision mediump float;
+
+varying vec3 V, N, L1, L2;
+float spec_intensity = 32.0;
+
+uniform vec3 ambient;
+
+uniform vec3 light1_diff;
+uniform vec3 light2_diff;
+
+uniform vec3 light1_spec;
+uniform vec3 light2_spec;
+
+void main()
+{
+
+	vec4 outColor1 = vec4(0.0);
+	vec4 outColor2 = vec4(0.0);
+
+	float diff1 = max(0.0, dot(N, L1));
+	vec3 color1 = diff1 * light1_diff;
+
+	vec3 R1 = normalize(reflect(-L1,N));
+
+	float spec1 = pow(max(dot(R1, V),0.0), spec_intensity);
+
+	color1 += spec1 * light1_spec;
+	if(spec1 > 1.0) {
+		outColor1 = vec4(light1_spec, 1.0);
+	}else{
+		outColor1 = clamp(vec4(color1, 1.0),0.0,1.0);
+	}
+
+	float diff2 = max(0.0, dot(N, L2));
+	vec3 color2 = diff2 * light2_diff;
+
+	vec3 R2 = normalize(reflect(-L2,N));
+
+	float spec2 = pow(max(dot(R2, V),0.0), spec_intensity);
+
+	color2 += spec2 * light2_spec;
+	if(spec2 > 1.0) {
+		outColor2 = vec4(light2_spec, 1.0);
+	}else{
+		outColor2 = clamp(vec4(color2, 1.0),0.0,1.0);
+	}
+
+	gl_FragColor = clamp(vec4(ambient, 1.0) + outColor1 + outColor2, 0.0, 1.0);
+
+}
+
+
+</script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+
+	precision mediump float;
+	//precision meduimp int;
+
+	uniform mat4 modelViewMatrix;
+	uniform mat4 projectionMatrix;
+
+	attribute vec3 position;
+
+	uniform vec4 myColor;
+	varying vec4 vColor;
+	varying vec3 vPosition;
+
+	uniform float time;
+	
+	void main(){
+
+		vec3 pos = position;
+
+		pos.x += sin(pos.x * 10.0 + time) * 0.1;
+		pos.y += cos(pos.y * 10.0 + time) * 0.2;
+		pos.z += sin(pos.z * 20.0 + time) * 0.3;
+
+		vColor = myColor;
+		vPosition = pos;
+
+		gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+	}
+
+
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+	precision mediump float;
+	precision mediump int;
+
+	uniform float time;
+
+	varying vec4 vColor;
+	varying vec3 vPosition;
+
+	void main()
+	{
+
+		vec4 color = vec4(vColor);
+		color.r += sin(vPosition.x * 10.0 + time) * 0.5;
+		color.b += cos(vPosition.x * 5.0 + time) * 1.0;
+
+		gl_FragColor = color;
+
+	}
+
+
+</script>
+
+<script>
+
+	var container;
+
+	var camera, scene, renderer;
+
+	var vs = document.getElementById('vertexShader').textContent;
+	var fs = document.getElementById('fragmentShader').textContent;
+
+	var pvs = document.getElementById('vertexPhong').textContent;
+	var pfs = document.getElementById('fragmentPhong').textContent;
+
+	var mesh1, mesh2, mesh3;
+	var pMaterial, vMaterial, tMaterial;
+
+	var ambient;
+
+	var light1_pos, light2_pos;
+	var light1_diff, light2_diff;
+	var light1_spec, light2_spec;
+	var pLight;
+
+	var angTex = new THREE.TextureLoader().load('angus.jpg');
+
+	init();
+	animate();
+
+	function init(){
+
+		container = document.getElementById('container');
+
+		angTex.wrapS = THREE.RepeatWrapping;
+		angTex.wrapT = THREE.RepeatWrapping;
+
+		camera = new THREE.PerspectiveCamera(60.0, window.innerWidth / window.innerHeight, 0.1, 50);
+		camera.position.z = 5;
+
+		scene = new THREE.Scene();
+
+		geometry1 = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+		geometry2 = new THREE.OctahedronGeometry(1, 0);
+		geometry3 = new THREE.IcosahedronGeometry(1, 0);
+
+		ambient = new THREE.Vector3(0.1,0.1,0.1);
+
+		light1_pos = new THREE.Vector3(0.0,10.0,0.0);
+		light1_diff = new THREE.Vector3(1.0,0.0,0.0);
+		light1_spec = new THREE.Vector3(1.0,1.0,1.0);
+
+		light2_pos = new THREE.Vector3(0.0,-10.0,0.0);
+		light2_diff = new THREE.Vector3(0.0,1.0,0.0);
+		light2_spec = new THREE.Vector3(1.0,1.0,1.0);
+
+		pLight = new THREE.PointLight(0xffffff, 1, 100);
+		pLight.position.set(4.0,0.0,5.0);
+		scene.add(pLight);
+
+
+		var uniforms = {
+			ambient: {type: "v3", value: ambient},
+			light1_pos: { type: "v3", value: light1_pos },
+    		light1_diff: { type: "v3", value: light1_diff },
+    		light1_spec:  { type: "v3", value: light1_spec },
+    		light2_pos: { type: "v3", value: light2_pos },
+    		light2_diff: { type: "v3", value: light2_diff },
+    		light2_spec:  { type: "v3", value: light2_spec },
+		}
+
+
+
+
+		pMaterial = new THREE.RawShaderMaterial({
+			uniforms: uniforms,
+			vertexShader: pvs,
+			fragmentShader: pfs
+		});
+
+		vMaterial = new THREE.RawShaderMaterial({
+			uniforms: {
+				time: {
+					type: "f",
+					value: 0.0
+				},
+				myColor: {
+					type: "v4",
+					value: new THREE.Vector4(0.0, 1.0, 1.0, 1.0)
+				}
+			},
+			vertexShader: vs,
+			fragmentShader: fs,
+		});
+
+		tMaterial = new THREE.MeshPhongMaterial({map: angTex});
+
+		geometry1.computeVertexNormals();
+		mesh1 = new THREE.Mesh(geometry1, pMaterial);
+		mesh1.translateX(-3.0);
+		scene.add(mesh1);
+
+		mesh2 = new THREE.Mesh(geometry2, vMaterial);
+		scene.add(mesh2);
+
+		mesh3 = new THREE.Mesh(geometry3, tMaterial);
+		mesh3.translateX(3.0);
+		scene.add(mesh3);
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor(0x999999);
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		container.appendChild(renderer.domElement);
+
+	}
+
+	function animate(){
+
+		requestAnimationFrame(animate);
+
+		var time = performance.now();
+
+		mesh1.rotation.x = time * 0.0005;
+
+		mesh2.rotation.y = time * 0.0005;
+		mesh2.rotation.x = time * 0.0003;
+
+		mesh3.rotation.x = time * 0.0005;
+		mesh3.rotation.y = time * 0.0003;
+
+		vMaterial.uniforms.time.value = time * 0.003;
+
+		light1_pos.x = Math.sin(time*0.001) * 10;
+		light2_pos.z = Math.sin(time*0.0008) * 10;
+		pLight.position.x = Math.sin(time*0.001)*10;
+
+		renderer.render(scene, camera);
+	}
+
+</script>
+
+
+</body>
+</html>
+

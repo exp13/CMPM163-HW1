@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>demo - Phong shader</title>
+		<meta charset="utf-8">
+		<style>
+			body {
+			  	margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+<body>
+
+<div id="container"></div>
+
+
+<script src="js/three.js"></script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+
+	precision mediump float;
+	//precision meduimp int;
+
+	uniform mat4 modelViewMatrix;
+	uniform mat4 projectionMatrix;
+
+	attribute vec3 position;
+
+	uniform vec4 myColor;
+	varying vec4 vColor;
+	varying vec3 vPosition;
+
+	uniform float time;
+	
+	void main(){
+
+		vec3 pos = position;
+
+		pos.x += sin(pos.x * 10.0 + time) * 0.1;
+		pos.y += cos(pos.y * 10.0 + time) * 0.2;
+		pos.z += sin(pos.z * 20.0 + time) * 0.3;
+
+		vColor = myColor;
+		vPosition = pos;
+
+		gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+	}
+
+
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+	precision mediump float;
+	precision mediump int;
+
+	uniform float time;
+
+	varying vec4 vColor;
+	varying vec3 vPosition;
+
+	void main()
+	{
+
+		vec4 color = vec4(vColor);
+		color.r += sin(vPosition.x * 10.0 + time) * 0.5;
+		color.b += cos(vPosition.x * 5.0 + time) * 1.0;
+
+		gl_FragColor = color;
+
+	}
+
+
+</script>
+
+<script>
+
+	var container;
+
+	var camera, scene, renderer;
+
+	var vs = document.getElementById('vertexShader').textContent;
+	var fs = document.getElementById('fragmentShader').textContent;
+
+	var mesh1, mesh2, mesh3;
+	var pMaterial, vMaterial, tMaterial;
+
+	var pLight1, pLight2, pLight3;
+
+	var angTex = new THREE.TextureLoader().load('angus.jpg');
+
+	init();
+	animate();
+
+	function init(){
+
+		container = document.getElementById('container');
+
+		angTex.wrapS = THREE.RepeatWrapping;
+		angTex.wrapT = THREE.RepeatWrapping;
+
+		camera = new THREE.PerspectiveCamera(60.0, window.innerWidth / window.innerHeight, 0.1, 50);
+		camera.position.z = 5;
+
+		scene = new THREE.Scene();
+
+		geometry1 = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+		geometry2 = new THREE.OctahedronGeometry(1, 0);
+		geometry3 = new THREE.IcosahedronGeometry(1, 0);
+
+		pLight1 = new THREE.PointLight(0xff0000, 1, 100);
+		pLight1.position.set(0,5,0);
+		scene.add(pLight1);
+
+		pLight2 = new THREE.PointLight(0x00ff00, 1, 100);
+		pLight2.position.set(0,5,5);
+		scene.add(pLight2);
+
+		pLight3 = new THREE.PointLight(0x0000ff, 1, 100);
+		pLight3.position.set(0,-5,0);
+		scene.add(pLight3);
+
+
+		pMaterial = new THREE.MeshPhongMaterial({
+			color: 0x55d6ed
+		});
+
+		vMaterial = new THREE.RawShaderMaterial({
+			uniforms: {
+				time: {
+					type: "f",
+					value: 0.0
+				},
+				myColor: {
+					type: "v4",
+					value: new THREE.Vector4(0.0, 1.0, 1.0, 1.0)
+				}
+			},
+			vertexShader: vs,
+			fragmentShader: fs,
+		});
+
+		tMaterial = new THREE.MeshPhongMaterial({map: angTex});
+
+		mesh1 = new THREE.Mesh(geometry1, pMaterial);
+		mesh1.translateX(-3.0);
+		scene.add(mesh1);
+
+		mesh2 = new THREE.Mesh(geometry2, vMaterial);
+		scene.add(mesh2);
+
+		mesh3 = new THREE.Mesh(geometry3, tMaterial);
+		mesh3.translateX(3.0);
+		scene.add(mesh3);
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor(0x999999);
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		container.appendChild(renderer.domElement);
+
+	}
+
+	function animate(){
+
+		requestAnimationFrame(animate);
+
+		var time = performance.now();
+
+		mesh1.rotation.x = time * 0.0005;
+
+		mesh2.rotation.y = time * 0.0005;
+		mesh2.rotation.x = time * 0.0003;
+
+		mesh3.rotation.x = time * 0.0005;
+		mesh3.rotation.y = time * 0.0003;
+
+		vMaterial.uniforms.time.value = time * 0.003;
+
+		pLight2.position.x = Math.sin(time*0.001) * 10;
+		pLight3.position.z = Math.sin(time*0.0008) * 10;
+
+		renderer.render(scene, camera);
+	}
+
+</script>
+
+
+</body>
+</html>
+
